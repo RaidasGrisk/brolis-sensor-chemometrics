@@ -1,5 +1,9 @@
 '''
 https://www.youtube.com/watch?v=CEUa1JgKcp0&ab_channel=VernierScienceEducation
+
+TODO:
+    experiment 1: instead of scaled raw absorbance data at each wavelength, do change in between subsequent wavelength.
+    This should do similar job to PCA (?) but better 🤔.
 '''
 
 import pandas as pd
