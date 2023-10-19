@@ -1,9 +1,26 @@
 '''
 https://www.youtube.com/watch?v=CEUa1JgKcp0&ab_channel=VernierScienceEducation
 
-TODO:
-    experiment 1: instead of scaled raw absorbance data at each wavelength, do change in between subsequent wavelength.
-    This should do similar job to PCA (?) but better 🤔.
+Noteworthy observations:
+
+    ▪ Instead of scaled raw absorbance data at each wavelength, do % change in between subsequent wavelengths.
+    This completely does not work and I've no understanding why. Does absorbance intercept manner that much?
+    spectra_ = spectra_.pct_change(axis=1).drop(0, axis=1)
+
+    ▪ Plot absorbance (y) vs concentration (x) at each wavelength. Expect it ta have a ~linear relationship?
+    Why there's no relationship at all..?
+
+    ▪ Using ridge regression (regularize by keeping the squares of coefficients as low as possible), we can see which
+    wavelengths are most used by the model to predict y. Some ranges are more useful than other. e.g. ~2110 and ~2300.
+    See ridge_feature_importance.py for visualization.
+
+    ▪ Currently, the only way to come to reasonable results is to either use PCA or regularize heavily to reduce X.
+    RandomForest, while not the best algo for this, could be used to pick features. Not now as not enough data points.
+
+    ▪ Too little data for RNN?
+
+    ▪ How do I interpret PCA that is done across the wavelengths?
+
 '''
 
 import pandas as pd
@@ -14,6 +31,10 @@ from sklearn import preprocessing
 from sklearn import linear_model
 from sklearn.decomposition import PCA
 from sklearn import feature_selection
+from sklearn.neural_network import MLPRegressor
+
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.inspection import permutation_importance
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
@@ -36,13 +57,18 @@ print(
 )
 
 spectra.set_index('wavelength').plot(legend=False)
-plt.scatter(
-    concentration['concentration_lactate'],
-    spectra.drop('wavelength', axis=1).T[0]
-)
+
+# plot absorbance (y) vs concentration (x) at each wavelength
+# shouldn't we expect it ta have a ~linear relationship?
+plt.figure()
+for i in range(1, spectra.shape[0]):
+    plt.scatter(
+        concentration['concentration_lactate'],
+        spectra.T[i].values[1:]
+    )
+
 
 # ------------- #
-
 
 # define x and y
 y = concentration['concentration_lactate']
@@ -53,12 +79,15 @@ X_train, X_test, y_train, y_test = train_test_split(spectra_, y, test_size=0.2, 
 
 # define model
 model = Pipeline([
+    # ('scale_each_sample', preprocessing.Normalizer()),
+    # ('add_polynomials', preprocessing.PolynomialFeatures(2, include_bias=False)),
     ('scale', preprocessing.StandardScaler()),
-    # ('feature_selection', feature_selection.RFE(linear_model.Ridge(alpha=0.5), n_features_to_select=20)),
+    # ('feature_selection', feature_selection.RFE(linear_model.Ridge(alpha=0.01), n_features_to_select=150)),
     ('reduce dims', PCA(20)),
+    # ('clf', RandomForestRegressor(n_estimators=10, min_samples_leaf=10)),
     ('clf', linear_model.LinearRegression()),
-    # ('clf', linear_model.Ridge(alpha=0.5)),
-    # ('clf', linear_model.Lasso(alpha=10)),
+    # ('clf', MLPRegressor(hidden_layer_sizes=[2], verbose=True, max_iter=200, tol=0.001)),
+    # ('clf', linear_model.Ridge(alpha=0.001)),  # can drop PCA
 ])
 
 # train
@@ -69,6 +98,31 @@ y_pred = model.predict(X_test)
 mse = mean_squared_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
 
-print(f'Mean Squared Error: {mse}')
+print(f'MSE: {mse}')
 print(f'R-squared: {r2}')
-# print(model.steps[1][1].coef_)
+print(model.steps[1][1].coef_)
+
+# ---------------- #
+
+# examine pca
+pca = PCA(20)
+pd.DataFrame(pca.fit_transform(preprocessing.StandardScaler().fit_transform(X_train)), index=X_train.index).iloc[:4, :].plot()
+plt.figure()
+plt.plot(pca.fit_transform(X_train))
+
+# random forest feature importance
+clf = RandomForestRegressor(n_estimators=5, min_samples_leaf=10)
+clf.fit(X_train, y_train)
+
+forest_importances = pd.Series(clf.feature_importances_, index=X_train.columns)
+plt.figure()
+forest_importances.sort_values(ascending=False)[:50].plot.bar()
+
+# feature permutation importance
+importance = permutation_importance(clf, X_train, y_train, n_repeats=10)
+plt.figure()
+pd.Series(importance.importances_mean, index=X_train.columns).sort_values(ascending=False)[:50].plot.bar()
+
+# inspect scaling
+X_train.T.plot()
+pd.DataFrame(preprocessing.StandardScaler().fit_transform(X_train)).T.plot()
