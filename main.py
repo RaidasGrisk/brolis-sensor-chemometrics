@@ -8,7 +8,7 @@ Noteworthy observations:
     spectra_ = spectra_.pct_change(axis=1).drop(0, axis=1)
 
     ▪ Plot absorbance (y) vs concentration (x) at each wavelength. Expect it ta have a ~linear relationship?
-    Why there's no relationship at all..?
+    Why there's no visible relationship..?
 
     ▪ Using ridge regression (regularize by keeping the squares of coefficients as low as possible), we can see which
     wavelengths are most used by the model to predict y. Some ranges are more useful than other. e.g. ~2110 and ~2300.
@@ -17,9 +17,17 @@ Noteworthy observations:
     ▪ Currently, the only way to come to reasonable results is to either use PCA or regularize heavily to reduce X.
     RandomForest, while not the best algo for this, could be used to pick features. Not now as not enough data points.
 
-    ▪ Too little data for RNN?
+    ▪ Too little data for RNN? No. There's no signal in the sequence of absorptivity across different wavelengths.
+    The signal lies in specific wavelengths, not the sequence.
 
-    ▪ How do I interpret PCA that is done across the wavelengths?
+    ▪ How do I interpret PCA that is done across the wavelengths? Specific PCA components shows very high (~70 to 95%)
+    correlation with target concentration.
+
+TODO: try PCA with polynomials?
+
+Best models:
+PCA(5) + Poly(2) + Ridge    - 0.924
+PCA(80) + CNN               - 0.922
 
 '''
 
@@ -80,14 +88,14 @@ X_train, X_test, y_train, y_test = train_test_split(spectra_, y, test_size=0.2, 
 # define model
 model = Pipeline([
     # ('scale_each_sample', preprocessing.Normalizer()),
-    # ('add_polynomials', preprocessing.PolynomialFeatures(2, include_bias=False)),
     ('scale', preprocessing.StandardScaler()),
     # ('feature_selection', feature_selection.RFE(linear_model.Ridge(alpha=0.01), n_features_to_select=150)),
     ('reduce dims', PCA(20)),
+    # ('add_polynomials', preprocessing.PolynomialFeatures(2, include_bias=False)),
     # ('clf', RandomForestRegressor(n_estimators=10, min_samples_leaf=10)),
     ('clf', linear_model.LinearRegression()),
     # ('clf', MLPRegressor(hidden_layer_sizes=[2], verbose=True, max_iter=200, tol=0.001)),
-    # ('clf', linear_model.Ridge(alpha=0.001)),  # can drop PCA
+    # ('clf', linear_model.Ridge(alpha=0.0015)),  # can drop PCA
 ])
 
 # train
@@ -100,7 +108,7 @@ r2 = r2_score(y_test, y_pred)
 
 print(f'MSE: {mse}')
 print(f'R-squared: {r2}')
-print(model.steps[1][1].coef_)
+print(model.steps[2][1].coef_)
 
 # ---------------- #
 

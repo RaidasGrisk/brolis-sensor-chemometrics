@@ -18,7 +18,7 @@ concentration = pd.read_csv('Concentration_set.csv')
 # Generate some example data
 # Replace this with your actual data
 x_data = spectra.drop('wavelength', axis=1).T
-y_data = concentration['concentration_lactate'] * 10000
+y_data = concentration['concentration_lactate'] * 100
 
 # x_data, y_data = make_regression(n_samples=400, n_features=350, noise=0.8, random_state=42)
 # x_data = pd.DataFrame(x_data)
@@ -32,10 +32,10 @@ x_data = scaler.fit_transform(x_data)
 # Train-test split
 x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_size=0.2)
 
-pca = PCA(80)
-pca.fit(x_train)
-x_train = pca.transform(x_train)
-x_test = pca.transform(x_test)
+# pca = PCA(40)
+# pca.fit(x_train)
+# x_train = pca.transform(x_train)
+# x_test = pca.transform(x_test)
 
 
 # define r-squared (lets use it as in other models)
@@ -48,23 +48,15 @@ def r_squared(y_true, y_pred):
 # Create an RNN model
 def init_model():
 
-    input = tf.keras.Input(shape=(x_train.shape[1]))
-    x = tf.keras.layers.Dense(128, activation='linear', kernel_regularizer=tf.keras.regularizers.L2(0.01))(input)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    x = tf.keras.layers.Dense(64, activation='linear')(x)
-    x = tf.keras.layers.Dense(16, activation='linear')(x)
-    y_ = tf.keras.layers.Dense(1, activation='linear')(x)
-
-    # input = tf.keras.Input(shape=(x_train.shape[1], 1))
-    # x = tf.keras.layers.LSTM(units=32, dropout=0.05, activation="tanh", recurrent_activation="sigmoid")(input)
-    # x = tf.keras.layers.Dense(12, activation='linear')(x)
-    # y_ = tf.keras.layers.Dense(1, activation='linear')(x)
+    input = tf.keras.Input(shape=(x_train.shape[1], 1))
+    x = tf.keras.layers.SimpleRNN(units=16, kernel_regularizer=tf.keras.regularizers.l2(0.01))(input)
+    y_ = tf.keras.layers.Dense(1, activation='relu', use_bias=False)(x)
 
     model = tf.keras.Model(inputs=input, outputs=y_)
     model.compile(
         loss=['mean_squared_error'],
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-        metrics=[r_squared]
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0025),
+        metrics=[r_squared],
     )
 
     return model
@@ -72,14 +64,15 @@ def init_model():
 
 # Train the model
 model = init_model()
-history = model.fit(x_train, y_train, epochs=500, validation_data=(x_test, y_test))
+model.summary()
+history = model.fit(x_train, y_train, epochs=2000, batch_size=x_train.shape[0], validation_data=(x_test, y_test))
 
 # plot results
 y_train.reset_index(drop=True).plot()
 pd.Series(model.predict(x_train).ravel()).plot()
 
 # Evaluate the model
-print(model.layers[1].weights, model.layers[2].weights)
+print(model.layers[2].weights, model.layers[1].weights)
 y_ = model.predict(x_test)
 loss, r_squared_score = model.evaluate(x_test, y_test)
 print("Mean Squared Error on Test Set:", loss)
