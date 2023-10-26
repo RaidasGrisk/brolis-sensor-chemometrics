@@ -28,6 +28,7 @@ num_points = 100
 exponential_series = np.exp(np.linspace(np.log(start), np.log(end), num_points))
 
 fig, ax = plt.subplots()
+plt.subplots_adjust(top=0.8)
 spectra.set_index('wavelength').plot(legend=False, ax=ax)
 # (spectra_.T.set_index(spectra['wavelength']) * 10).plot(legend=False, ax=ax)
 for alpha in exponential_series:
@@ -49,5 +50,9 @@ for alpha in exponential_series:
     min_value = np.min(model.steps[1][1].coef_)
     max_value = np.max(model.steps[1][1].coef_)
     importance = (model.steps[1][1].coef_ - min_value) / (max_value - min_value)
-    pd.Series(importance, index=spectra['wavelength']).plot(ax=ax, title=f"R2: {r2.round(2)}, alpha: {alpha.round(6)}")
+    note = 'The curve at the bottom show feature importance. \n Higher values -> more important. \n\n'
+    pd.Series(importance, index=spectra['wavelength']).plot(
+        ax=ax,
+        title=f"{note} R2: {r2.round(2)}, alpha: {alpha.round(6)}",
+    )
     plt.pause(0.0001)
